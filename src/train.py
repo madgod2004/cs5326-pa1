@@ -122,9 +122,18 @@ def build_precision(device: torch.device, amp: bool):
     """
     use_amp = amp and device.type == "cuda"
     if not use_amp:
+        print(f"precision: fp32 (amp={amp}, device={device.type})", flush=True)
         return (lambda: contextlib.nullcontext()), torch.amp.GradScaler(device.type, enabled=False)
-    use_bfloat16 = torch.cuda.is_bf16_supported()
+    # torch.cuda.is_bf16_supported() reports True on Turing via emulation, which
+    # measures ~10x slower than fp16 there. Only capability 8.0+ is native.
+    capability = torch.cuda.get_device_capability()
+    use_bfloat16 = capability[0] >= 8
     dtype = torch.bfloat16 if use_bfloat16 else torch.float16
+    print(
+        f"precision: {'bf16' if use_bfloat16 else 'fp16'} autocast "
+        f"(compute capability {capability[0]}.{capability[1]})",
+        flush=True,
+    )
     factory = lambda: torch.autocast(device_type="cuda", dtype=dtype)  # noqa: E731
     return factory, torch.amp.GradScaler("cuda", enabled=not use_bfloat16)
 
@@ -209,10 +218,11 @@ def main(argv: list[str] | None = None) -> None:
     print(
         f"device={device} | parameters={model.num_parameters():,} | "
         f"tokens/update={tokens_per_update:,} | "
-        f"total sampled tokens={tokens_per_update * args.num_steps:,}"
+        f"total sampled tokens={tokens_per_update * args.num_steps:,}",
+        flush=True,
     )
     if args.overfit_one_batch:
-        print("overfit_one_batch: training on a single fixed minibatch")
+        print("overfit_one_batch: training on a single fixed minibatch", flush=True)
 
     autocast_factory, scaler = build_precision(device, args.amp)
 
