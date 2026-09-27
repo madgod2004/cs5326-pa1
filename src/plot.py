@@ -11,7 +11,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 from pathlib import Path
+
+# Jupyter hosts export MPLBACKEND=module://matplotlib_inline..., which a plain
+# interpreter rejects at import time. Drop it before matplotlib reads it.
+os.environ.pop("MPLBACKEND", None)
 
 import matplotlib
 
