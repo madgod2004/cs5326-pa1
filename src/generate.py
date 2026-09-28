@@ -100,8 +100,12 @@ def generate(
                 filtered = filtered / filtered.sum(dim=-1, keepdim=True)
 
                 # Sample a rank, then map it back to the real vocabulary ID.
-                rank = torch.multinomial(filtered, num_samples=1, generator=generator)
-                token = int(sorted_indices[rank].item())
+                # multinomial needs the distribution on the generator's device,
+                # so a CPU generator still works when the model is on CUDA.
+                if generator is not None:
+                    filtered = filtered.to(generator.device)
+                rank = int(torch.multinomial(filtered, num_samples=1, generator=generator))
+                token = int(sorted_indices[rank])
                 tokens.append(token)
 
                 if eot_token_id is not None and token == eot_token_id:
